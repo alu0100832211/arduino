@@ -14,9 +14,10 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 #include "disparo.h"
 #include "rocks.h"
 #include "coord.h"
+#include "game_over.h"
 
-#define PLAYING 0;
-#define GAME_OVER 1;
+#define PLAYING 0
+#define GAME_OVER 1
 
 #define SCREEN_W 160
 #define SCREEN_H 118
@@ -37,24 +38,25 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 #define MAX_ACTIVE_ROCKS 10
 #define MAX_ACTIVE_DISPAROS 10
 #define MAX_ACTIVE_ESTRELLAS 50
-int x = 0;
-int y = 0;
+int x = SCREEN_W/2-SHIP_W/2;
+int y = SCREEN_H-SHIP_H;
 unsigned active_disparos = 0;
 unsigned active_rocks = 0;
 unsigned long last_shot_time, t_delay = 0, t_laser = 0, t_rocks=0, 
               t_spawn_rock=0, t_score=0, t_estrellas = 0;
 unsigned int score = 0;
+unsigned int game_state = GAME_OVER;
 
 disparo_s disparo [MAX_ACTIVE_DISPAROS];
 rock_s rock [MAX_ACTIVE_ROCKS];
 coord_s estrella [MAX_ACTIVE_ESTRELLAS];
 
 void setup() {
-  
+  Serial.begin(9600);
   pinMode(JOYSTICK_BUTTON, INPUT_PULLUP);
   tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
   tft.fillScreen(ST7735_BLACK);
-  tft.fillRect(0, 0, 128-SCREEN_H, SCREEN_W, ST7735_GREEN);
+  //tft.fillRect(0, 0, 128-SCREEN_H, SCREEN_W, ST7735_GREEN);
   tft.setRotation(1);
   tft.setTextColor(ST7735_BLACK, ST7735_GREEN);
   init_disparos();
@@ -63,11 +65,14 @@ void setup() {
 }
 
 void loop() {
+  start_screen();
+  while(game_state == PLAYING){
   unsigned long t = millis();
   if(t_score < t){
     t_score = t + V_SCORE;
+    tft.fillRect(0, SCREEN_H, 160, 128, ST7735_GREEN);
     tft.setCursor(0,SCREEN_H);    
-    tft.print("Score: ");tft.println(t);
+    tft.print("Score: ");tft.println(score);
   }
   //void fillRect(uint16_t x0, uint16_t y0, uint16_t w, uint16_t h, uint16_t color);  
   int y_desp = (analogRead(A0)+20)/100-5;
@@ -98,11 +103,9 @@ void loop() {
     if( y < 0 ) y = 0;
     if (y > SCREEN_H-SHIP_H) y = SCREEN_H-SHIP_H;
     tft.drawBitmap(x, y, ship_sprite, SHIP_W, SHIP_H, ST7735_WHITE);
-    tft.drawPixel(x,y,ST7735_RED);
   }
 
   
-  tft.drawPixel((x + SHIP_W/2), y , ST7735_RED);
   if(t_laser < t && active_disparos){
     t_laser = t+V_DISPARO;
       move_disparos();
@@ -119,6 +122,32 @@ void loop() {
     }
   
   detect_colisions();
+  }
+  game_over();
+}
+
+void start_screen(){
+ 
+  }  
+
+void game_over(){
+  unsigned int t_delay = 0;
+  bool invert = true;
+  score = 0;
+  tft.drawBitmap(0,0, game_over_bitmap, 160, 128, ST7735_WHITE);
+  game_state = PLAYING;
+  while(true){
+    unsigned int t = millis();
+    if(t_delay < t){
+      t_delay = t + 500;
+      invert = (invert) ? 0 : 1;
+      tft.invertDisplay(invert);
+    }
+    if(!digitalRead(JOYSTICK_BUTTON)) break;
+  
+  }
+  tft.invertDisplay(false);
+  tft.fillRect(0,0, 160, 128, ST7735_BLACK);
 }
 
 void detect_colisions(void){
@@ -127,13 +156,15 @@ void detect_colisions(void){
   }
 
 void detect_laser_rock_colisions(){
+  
   for(int i = 0; i < MAX_ACTIVE_ROCKS; i++){
     for(int j = 0; j < MAX_ACTIVE_DISPAROS; j++){
       int distancex = (disparo[j].x - rock[i].x);
       int distancey = (disparo[j].y - rock[i].y);
-      if(!(rock[i].active && disparo[j].active)) break;
+      if(!(rock[i].active && disparo[j].active) || rock[i].explotar) break;
       if ((distancex < ROCK1_W) && (distancex > 0) && (distancey < ROCK1_H)){        
         rock[i].explotar = true;
+        score+=50;
       }
     }
   }
@@ -222,6 +253,7 @@ void move_rock(int i){
   }
   else{
     rock[i].active = false;
+    game_state = GAME_OVER;
     active_rocks--;
   }
 }
