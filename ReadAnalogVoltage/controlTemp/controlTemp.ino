@@ -1,6 +1,7 @@
 #include <LiquidCrystal.h>
 #include "Encoder.h"
 
+// Inicializar pantalla LCD
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 int pinBMas = 8; 
 int pinBMenos = 7;
@@ -12,10 +13,10 @@ float tInput = 20;
 unsigned long startMillis;
 unsigned long currentMillis;
 
-
+//Asignar los pines al Encoder de Encoder.h
 Encoder ruedita(pinBMas, pinBMenos);
 
-
+//Función inicial para asignar tiempo inicial, y modos de los pines
 void setup(){
   Serial.begin(9600);
   lcd.begin(8,2);
@@ -26,40 +27,24 @@ void setup(){
   digitalWrite(pinBMenos, HIGH);
   pinMode(pinBMas, INPUT);
   digitalWrite(pinBMas, HIGH);
-  //boton pulsado = LOW
-  //boton sin pulsar = HIGH
 }
 
 
 void loop(){
   t = get_temp();
-  //Poner velocidad del ventilador 
-//  int fanSpeed = map_float(t, tInput, 50, 255, 0);
-//  fanSpeed = constrain(fanSpeed, 0, 255);
-//  int incrementar = digitalRead(pinBMas);
-//  if(incrementar == LOW){
-//    Serial.println("incrementar");
-//    tInput+=0.5;
-//  }
-//  int decrementar = digitalRead(pinBMenos);
-//  if(decrementar == LOW){
-//    Serial.println("decrementar");
-//    tInput-=0.5;
-//  }
-//  Serial.println(ruedita.read());
+  //Corrigiendo el valor de read() para que nos de 0
   tInput = 20.0 + ruedita.read()*0.1;
-//  Serial.print(digitalRead(pinBMas));Serial.print(digitalRead(pinBMenos));Serial.print("\n");
-
-  
+  //La diferencia de la temperatura deseada y la temperatura real
   float error = t - tInput;
+  //Ajustando el valor del ventilador proporcionalmente
   int fanSpeed = 50*error;
-  fanSpeed = constrain(fanSpeed, 0, 255);
-  fanSpeed = map(fanSpeed, 0, 255, 255, 0);
-  
-//  Serial.print(fanSpeed);Serial.print(" ");
-
+  //Esta función actua como tope para valores fuera del rango 0-255
+  fanSpeed = constrain(fanSpeed, 0, 255); 
+  //Invertir proporcionalmente el valor para que lo lea el ventilador
+  fanSpeed = map(fanSpeed, 0, 255, 255, 0); 
+  //Escribir valor en el ventilador
   analogWrite(pwmPin, fanSpeed);
-
+  //Actualizar el valor de la pantalla cada 200 ms
   currentMillis = millis();
   if((currentMillis - startMillis) > 200){
     startMillis = currentMillis;
@@ -70,24 +55,12 @@ void loop(){
     lcd.print(tInput);lcd.print("C ");
     lcd.display();
   }
-  //lcd.noDisplay();
-      
-//  Serial.print(t);Serial.print("C ");
-//  Serial.print(map(fanSpeed, 255, 0, 0, 100));Serial.print("% ");
-//  Serial.print(tInput);Serial.print("C temperatura deseada\n");
 }
-
-//map con decimales https://www.arduino.cc/reference/en/language/functions/math/map/
-long map_float(float x, long in_min, long in_max,  long out_min, long out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-
+//Función para obtener el valor de la temperatura actual
 float get_temp (void){
   int sensorValue = analogRead(A0);
+  //Transformación del valor del sensor a un valor de voltaje
   float voltage = sensorValue * (5.0 / 1023.0);
+  //Transformación del voltaje en temperatura
   return (voltage / 10.4) * 100;
-
- // return (analogRead(tPin) * 0.046996015);
 }
